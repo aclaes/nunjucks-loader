@@ -10,6 +10,7 @@
 var nunjucks = require('nunjucks');
 var slash = require('slash');
 var path = require('path');
+var fs = require('fs');
 var loaderUtils = require('loader-utils');
 var env;
 var hasRun = false;
