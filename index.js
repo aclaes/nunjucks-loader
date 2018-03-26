@@ -73,6 +73,50 @@ module.exports = function (source) {
         hasRun = true;
     }
 
+    // ==============================================================================
+    // inject all named imports that are marked with "{#browserinject#}" suffix
+    // ==============================================================================
+    let injectedTemplates = [];
+
+    const injectTemplate = function (source, match, filepath, name, pathContext){
+      source = source.replace(new RegExp(match, 'g'), '');
+
+      let templatePath = path.resolve(pathContext, filepath);
+      let id = path.basename(templatePath + name);
+      if(injectedTemplates.indexOf(id) === -1){
+        injectedTemplates.push(id);
+        let data = fs.readFileSync(templatePath).toString();
+        let macroDefReg = /{%\smacro\srender\(/g;
+        data = data.replace(macroDefReg, '{% macro '+name+'_render(');
+        data = replaceImports(data, path.dirname(templatePath), false);
+        source = data + source;
+      }
+
+      let macroUseReg = new RegExp(name+'.render\\(', 'g');
+      source = source.replace(macroUseReg, name+'_render(');
+
+      return source;
+    }
+
+    const replaceImports = function(source, pathContext, initial){
+      let importRegPattern = '{%\\simport\\s(["\'])([A-Z-a-z0-9/.-_]+)(["\'])\\sas\\s(\\S+)\\s%}';
+      if(initial){
+        importRegPattern += '{#browserinject#}';
+      }
+      let importReg = new RegExp(importRegPattern, 'g');
+      let newSource = ''+source;
+      while (match = importReg.exec(source)) {
+        newSource = injectTemplate(newSource, match[0], match[2], match[4], pathContext)
+      }
+      return newSource;
+    }
+
+    source = replaceImports(source, this.context, true);
+
+    // ==============================================================================
+    // precompile the source string
+    // ==============================================================================
+
     var name = slash(path.relative(root || this.rootContext || this.options.context, this.resourcePath));
 
     var nunjucksCompiledStr = nunjucks.precompileString(source, {
